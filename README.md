@@ -35,6 +35,7 @@ A precise audio sequencer for Unity3d
 
 ### Alternative Usages
 * **Sequencer Driver** can be used instead of **Sequencer Group** but you should manually set which **Sequencer** or **Sequencer Grops** it should manage.
+
 ![Sequencer Driver](http://i.imgur.com/vLhppb2.png)
 * **Sequencer** can also be used without a **Sequncer Group** or **Sequencer Driver**
 ![Sequencer Only](http://i.imgur.com/uxSKPBf.png)
