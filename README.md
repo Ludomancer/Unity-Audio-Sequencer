@@ -1,7 +1,7 @@
 # Unity-Audio-Sequencer
 A precise audio sequencer for Unity3d
 
-## Basic feature list:
+## Features
 
  * **Seamless** and **Stable** Audio Sequencer.
  * Stable even in high **metronomes**.
@@ -17,7 +17,7 @@ A precise audio sequencer for Unity3d
 ## Components
 * **Sequencer:** Basic and main component that actually plays the audio files.
 * **Sequener Group:** Manages child sequencers.
-* **Sequencer Driver:** Manager any list of Sequencer Groups or Sequencers.
+* **Sequencer Driver:** Manages any list of Sequencer Groups or Sequencers.
 * **Sequencer Base:** Base class for all of the classes above. Should not be used by itself.
 
 
