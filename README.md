@@ -24,6 +24,7 @@ A precise audio sequencer for Unity3d
 ## Setup
 ### Sample
 * Use **Sample Prefab** provided or open the **Sample Scene** to see a working example.
+
 ### Step by Step
 * Import and set your audio files to **Decompress on Load**.
 * Create a **Sequencer Group**. It will automtically create a **Sequencer** as child.
