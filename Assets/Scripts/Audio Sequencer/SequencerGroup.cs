@@ -123,6 +123,23 @@ public class SequencerGroup : SequencerBase
     }
 
     /// <summary>
+    /// Play all connected sequencers.
+    /// </summary>
+    /// <param name="fadeDuration"></param>
+    public override void Play(float fadeDuration)
+    {
+        if (!IsPlaying)
+        {
+            for (int i = 0; i < _sequencers.Length; i++)
+            {
+                _sequencers[i].bpm = bpm;
+                _sequencers[i].Play(fadeDuration);
+            }
+            IsPlaying = true;
+        }
+    }
+
+    /// <summary>
     /// Stop all connected sequencers.
     /// </summary>
     public override void Stop()
@@ -138,16 +155,49 @@ public class SequencerGroup : SequencerBase
     }
 
     /// <summary>
-    /// Pause/Unpause all connected sequencers.
+    /// Stop all connected sequencers.
     /// </summary>
-    /// <param name="pause"></param>
-    public override void Pause(bool pause)
+    /// <param name="fadeDuration"></param>
+    public override void Stop(float fadeDuration)
     {
-        if ((IsPlaying && pause) || (!IsPlaying && !pause))
+        if (IsPlaying)
         {
             for (int i = 0; i < _sequencers.Length; i++)
             {
-                _sequencers[i].Pause(pause);
+                _sequencers[i].Stop(fadeDuration);
+            }
+            IsPlaying = false;
+        }
+    }
+
+    /// <summary>
+    /// Pause/Unpause all connected sequencers.
+    /// </summary>
+    /// <param name="isPaused"></param>
+    public override void Pause(bool isPaused)
+    {
+        if ((IsPlaying && isPaused) || (!IsPlaying && !isPaused))
+        {
+            for (int i = 0; i < _sequencers.Length; i++)
+            {
+                _sequencers[i].Pause(isPaused);
+            }
+            IsPlaying = !IsPlaying;
+        }
+    }
+
+    /// <summary>
+    /// Pause/Unpause all connected sequencers.
+    /// </summary>
+    /// <param name="isPaused"></param>
+    /// <param name="fadeDuration"></param>
+    public override void Pause(bool isPaused, float fadeDuration)
+    {
+        if ((IsPlaying && isPaused) || (!IsPlaying && !isPaused))
+        {
+            for (int i = 0; i < _sequencers.Length; i++)
+            {
+                _sequencers[i].Pause(isPaused, fadeDuration);
             }
             IsPlaying = !IsPlaying;
         }
@@ -168,6 +218,46 @@ public class SequencerGroup : SequencerBase
 #if UNITY_EDITOR
         _isMutedOld = this.isMuted;
 #endif
+    }
+
+    /// <summary>
+    /// Mute/Unmute all connected sequencers.
+    /// </summary>
+    /// <param name="isMuted"></param>
+    /// <param name="fadeDuration"></param>
+    public override void Mute(bool isMuted, float fadeDuration)
+    {
+        for (int i = 0; i < _sequencers.Length; i++)
+        {
+            _sequencers[i].Mute(isMuted, fadeDuration);
+        }
+        this.isMuted = isMuted;
+
+#if UNITY_EDITOR
+        _isMutedOld = this.isMuted;
+#endif
+    }
+
+    /// <summary>
+    /// Changes default fade in and fade out durations of all connected sequencers.
+    /// </summary>
+    /// <param name="fadeIn"></param>
+    /// <param name="fadeOut"></param>
+    public override void SetFadeDurations(float fadeIn, float fadeOut)
+    {
+        for (int i = 0; i < _sequencers.Length; i++)
+        {
+            _sequencers[i].SetFadeDurations(fadeIn, fadeOut);
+        }
+    }
+
+    /// <summary>
+    ///  Toggle mute state.
+    /// </summary>
+    public override void ToggleMute()
+    {
+        isMuted = !isMuted;
+        Mute(isMuted);
     }
 
     /// <summary>

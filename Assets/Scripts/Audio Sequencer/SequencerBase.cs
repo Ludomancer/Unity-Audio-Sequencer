@@ -31,7 +31,7 @@ SOFTWARE.
 using UnityEngine;
 using System.Collections.Generic;
 
-public class SequencerBase : MonoBehaviour
+public abstract class SequencerBase : MonoBehaviour
 {
 
     #region Enumerations
@@ -91,51 +91,33 @@ public class SequencerBase : MonoBehaviour
         OnAwake();
     }
 
-    public virtual void OnAwake()
-    {
+    public abstract void OnAwake();
 
-    }
+    public abstract void Play();
 
-    public virtual void Play()
-    {
-    }
+    public abstract void Play(double newPercentage);
 
-    public virtual void Play(double newPercentage)
-    {
-    }
+    public abstract void Play(float fadeDuration);
 
-    public virtual void Stop()
-    {
-    }
+    public abstract void Stop();
 
-    public virtual void SetBpm(int newBpm)
-    {
-    }
+    public abstract void Stop(float fadeDuration);
 
-    public virtual void SetPercentage(double newPercentage)
-    {
-    }
+    public abstract void SetBpm(int newBpm);
 
-    public virtual void Pause(bool isPaused)
-    {
-    }
+    public abstract void SetPercentage(double newPercentage);
 
-    /// <summary>
-    /// Mute/Unmute sequencer.
-    /// </summary>
-    /// <param name="isMuted"></param>
-    public virtual void Mute(bool isMuted)
-    {
-        this.isMuted = isMuted;
-    }
+    public abstract void Pause(bool isPaused);
 
-    /// <summary>
-    /// Toggle mute status.
-    /// </summary>
-    public virtual void ToggleMute()
-    {
-        Mute(!isMuted);
-    }
+    public abstract void Pause(bool isPaused, float fadeDuration);
+
+    public abstract void Mute(bool isMuted);
+
+    public abstract void Mute(bool isMuted, float fadeDuration);
+
+    public abstract void SetFadeDurations(float fadeIn, float fadeOut);
+
+    public abstract void ToggleMute();
 
     #endregion
 

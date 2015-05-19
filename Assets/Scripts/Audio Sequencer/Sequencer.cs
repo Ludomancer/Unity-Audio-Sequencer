@@ -232,17 +232,31 @@ internal class Sequencer : SequencerBase
         else Debug.LogWarning("Audio Clip can not be null.");
     }
 
+    /// <summary>
+    /// Set mute state.
+    /// </summary>
+    /// <param name="isMuted"></param>
     public override void Mute(bool isMuted)
     {
-        if (isMuted && fadeOutDuration > 0 && fadeWhen.IsFlagSet(FadeTarget.Mute))
+        Mute(isMuted, isMuted ? fadeOutDuration : fadeInDuration);
+    }
+
+    /// <summary>
+    ///  Toggle mute state.
+    /// </summary>
+    /// <param name="isMuted"></param>
+    /// <param name="fadeDuration"></param>
+    public override void Mute(bool isMuted, float fadeDuration)
+    {
+        if (isMuted && fadeDuration > 0 && fadeWhen.IsFlagSet(FadeTarget.Mute))
         {
             _fadeTarget = FadeTarget.Mute;
-            FadeOut();
+            FadeOut(fadeDuration);
         }
-        else if (!isMuted && fadeInDuration > 0 && fadeWhen.IsFlagSet(FadeTarget.UnMute))
+        else if (!isMuted && fadeDuration > 0 && fadeWhen.IsFlagSet(FadeTarget.UnMute))
         {
             _fadeTarget = FadeTarget.UnMute;
-            FadeIn();
+            FadeIn(fadeDuration);
         }
         else
         {
@@ -252,26 +266,20 @@ internal class Sequencer : SequencerBase
         }
     }
 
-    private void FadeIn()
+    /// <summary>
+    /// Changes default fade in and fade out durations.
+    /// </summary>
+    /// <param name="fadeIn"></param>
+    /// <param name="fadeOut"></param>
+    public override void SetFadeDurations(float fadeIn, float fadeOut)
     {
-        _fadeSpeed = 1f / fadeInDuration;
-        _fadeProgress = 0;
-        MuteInternal(false);
-        _volumeBeforeFade = _audioSource.volume;
-        _volumeAfterFade = _initialVolumeValue;
-    }
-
-    private void FadeOut()
-    {
-        _fadeSpeed = 1f / fadeOutDuration;
-        _fadeProgress = 0;
-        _volumeBeforeFade = _audioSource.volume;
-        _volumeAfterFade = 0;
+        fadeInDuration = fadeIn;
+        fadeOutDuration = fadeOut;
     }
 
     private void MuteInternal(bool isMuted)
     {
-        base.Mute(isMuted);
+        this.isMuted = isMuted;
 #if UNITY_EDITOR
         _isMutedOld = this.isMuted;
 #endif
@@ -282,11 +290,30 @@ internal class Sequencer : SequencerBase
     /// </summary>
     public override void Play()
     {
-        if (!IsPlaying && fadeInDuration > 0 && fadeWhen.IsFlagSet(FadeTarget.Play))
+        Play(fadeInDuration);
+    }
+
+    /// <summary>
+    /// Start playing from specified percentage.
+    /// </summary>
+    /// <param name="newPercentage"></param>
+    public override void Play(double newPercentage)
+    {
+        SetPercentage(newPercentage);
+        Play();
+    }
+
+    /// <summary>
+    /// Start playing.
+    /// </summary>
+    /// <param name="fadeDuration"></param>
+    public override void Play(float fadeDuration)
+    {
+        if (!IsPlaying && fadeDuration > 0 && fadeWhen.IsFlagSet(FadeTarget.Play))
         {
             _fadeTarget = FadeTarget.Play;
             PlayInternal();
-            FadeIn();
+            FadeIn(fadeDuration);
         }
         else
         {
@@ -313,10 +340,19 @@ internal class Sequencer : SequencerBase
     /// </summary>
     public override void Stop()
     {
-        if (IsPlaying && fadeOutDuration > 0 && fadeWhen.IsFlagSet(FadeTarget.Stop))
+        Stop(fadeOutDuration);
+    }
+
+    /// <summary>
+    /// Stop playing.
+    /// </summary>
+    /// <param name="fadeDuration"></param>
+    public override void Stop(float fadeDuration)
+    {
+        if (IsPlaying && fadeDuration > 0 && fadeWhen.IsFlagSet(FadeTarget.Stop))
         {
             _fadeTarget = FadeTarget.Stop;
-            FadeOut();
+            FadeOut(fadeDuration);
         }
         else
         {
@@ -337,33 +373,43 @@ internal class Sequencer : SequencerBase
     }
 
     /// <summary>
-    /// Pause/Unpause palying. Not tested.
+    /// Pause/Unpause.
     /// </summary>
-    /// <param name="pause"></param>
-    public override void Pause(bool pause)
+    /// <param name="isPaused"></param>
+    public override void Pause(bool isPaused)
     {
-        if (pause && fadeOutDuration > 0 && fadeWhen.IsFlagSet(FadeTarget.Pause))
+        Pause(isPaused, isPaused ? fadeOutDuration : fadeInDuration);
+    }
+
+    /// <summary>
+    /// Pause/Unpause.
+    /// </summary>
+    /// <param name="isPaused"></param>
+    /// <param name="fadeDuration"></param>
+    public override void Pause(bool isPaused, float fadeDuration)
+    {
+        if (isPaused && fadeDuration > 0 && fadeWhen.IsFlagSet(FadeTarget.Pause))
         {
             _fadeTarget = FadeTarget.Pause;
-            FadeOut();
+            FadeOut(fadeDuration);
         }
-        else if (!pause && fadeInDuration > 0 && fadeWhen.IsFlagSet(FadeTarget.UnPause))
+        else if (!isPaused && fadeDuration > 0 && fadeWhen.IsFlagSet(FadeTarget.UnPause))
         {
             _fadeTarget = FadeTarget.UnPause;
             PauseInternal(false);
-            FadeIn();
+            FadeIn(fadeDuration);
         }
         else
         {
             _audioSource.volume = isMuted ? 0 : _initialVolumeValue;
             _fadeProgress = 1;
-            PauseInternal(pause);
+            PauseInternal(isPaused);
         }
     }
 
-    private void PauseInternal(bool pause)
+    private void PauseInternal(bool isPaused)
     {
-        if (pause)
+        if (isPaused)
         {
             _audioSource.Pause();
             _isPlaying = false;
@@ -373,6 +419,31 @@ internal class Sequencer : SequencerBase
             _audioSource.UnPause();
             _isPlaying = true;
         }
+    }
+
+    /// <summary>
+    /// Toggle mute state.
+    /// </summary>
+    public override void ToggleMute()
+    {
+        isMuted = !isMuted;
+    }
+
+    private void FadeIn(float duration)
+    {
+        _fadeSpeed = 1f / duration;
+        _fadeProgress = 0;
+        MuteInternal(false);
+        _volumeBeforeFade = _audioSource.volume;
+        _volumeAfterFade = _initialVolumeValue;
+    }
+
+    private void FadeOut(float duration)
+    {
+        _fadeSpeed = 1f / duration;
+        _fadeProgress = 0;
+        _volumeBeforeFade = _audioSource.volume;
+        _volumeAfterFade = 0;
     }
 
     /// <summary>

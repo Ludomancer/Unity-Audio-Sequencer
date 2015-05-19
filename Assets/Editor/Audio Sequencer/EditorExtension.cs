@@ -53,9 +53,7 @@ public class EnumBitMaskPropertyDrawer : PropertyDrawer
 {
     public override void OnGUI(Rect position, SerializedProperty prop, GUIContent label)
     {
-        var typeAttr = attribute as BitMaskAttribute;
-        // Add the actual int value behind the field name
-        label.text = label.text;// + "(" + prop.intValue + ")";
+        label.text = label.text;
         prop.intValue = EditorExtension.DrawBitMaskField(position, prop.intValue, fieldInfo.FieldType, label);
     }
 }
