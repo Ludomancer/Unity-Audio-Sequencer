@@ -28,6 +28,7 @@ SOFTWARE.
 ************************************************************************************************************/
 #endregion
 
+using UnityEngine.UI;
 using System.Collections;
 using System;
 using UnityEngine;
@@ -41,6 +42,17 @@ internal class Sequencer : SequencerBase
 {
 
     #region Enumerations
+
+    [Flags]
+    public enum FadeTarget
+    {
+        Play = (1 << 0),
+        Stop = (1 << 1),
+        Mute = (1 << 2),
+        UnMute = (1 << 3),
+        Pause = (1 << 4),
+        UnPause = (1 << 5)
+    }
 
     #endregion
 
@@ -65,10 +77,6 @@ internal class Sequencer : SequencerBase
     /// </summary>
     public int signatureLo = 4;
     /// <summary>
-    /// High signautre
-    /// </summary>
-    public int signatureHi = 4;
-    /// <summary>
     /// Sequence of steps.
     /// True = Play
     /// False = Silent
@@ -77,11 +85,28 @@ internal class Sequencer : SequencerBase
     /// <summary>
     /// Maximum back buffer allowed.
     /// </summary>
+    [Range(0, 100)]
     public int maxBackBufferSize = 0;
     /// <summary>
     /// Enlarge backbuffer count by number specified.
     /// </summary>
+    [Range(0, 100)]
     public int increaseBackBufferBy = 0;
+    /// <summary>
+    /// Fade in duration from muted to unmuted.
+    /// </summary>
+    [Range(0, 60)]
+    public float fadeInDuration;
+    /// <summary>
+    /// Fade in duration from unmuted to muted.
+    /// </summary>
+    [Range(0, 60)]
+    public float fadeOutDuration;
+    /// <summary>
+    /// When to trigger fade.
+    /// </summary>
+    [BitMask]
+    public FadeTarget fadeWhen;
     /// <summary>
     /// Current step.
     /// </summary>
@@ -122,6 +147,34 @@ internal class Sequencer : SequencerBase
     /// Temporary variable to set percentage on Audio Thread.
     /// </summary>
     private double _newPercentage = -1;
+    /// <summary>
+    /// Initial volume value to fade in.
+    /// </summary>
+    private float _initialVolumeValue;
+    /// <summary>
+    /// Volume of audio source just before fading in or out
+    /// </summary>
+    private float _volumeBeforeFade;
+    /// <summary>
+    /// Target volume when fade in/or finishes.
+    /// </summary>
+    private float _volumeAfterFade;
+    /// <summary>
+    /// Curernt percentage of fade progress.
+    /// </summary>
+    private float _fadeProgress = 1;
+    /// <summary>
+    /// Current fade speed;
+    /// </summary>
+    private float _fadeSpeed;
+    /// <summary>
+    /// What are we fading into.
+    /// </summary>
+    private FadeTarget _fadeTarget;
+    /// <summary>
+    /// Attached audio source.
+    /// </summary>
+    private AudioSource _audioSource;
     #endregion
 
     #region Properties
@@ -136,8 +189,12 @@ internal class Sequencer : SequencerBase
 
     #region Methods
 
-    private void Awake()
+    public override void OnAwake()
     {
+#if UNITY_EDITOR
+        _isMutedOld = this.isMuted;
+        _oldBpm = this.bpm;
+#endif
         StartCoroutine(Init());
     }
 
@@ -147,20 +204,77 @@ internal class Sequencer : SequencerBase
     /// <returns></returns>
     private IEnumerator Init()
     {
-        while (_clipData == null)
+        _audioSource = GetComponent<AudioSource>();
+        if (clip == null)
         {
-            if (clip.loadState == AudioDataLoadState.Loaded)
+            clip = _audioSource.clip;
+        }
+        if (clip != null)
+        {
+            _initialVolumeValue = _audioSource.volume;
+            _volumeAfterFade = _initialVolumeValue;
+            _audioSource.volume = 0;
+            while (_clipData == null)
             {
-                _sampleRate = AudioSettings.outputSampleRate;
-                _clipData = new float[clip.samples * clip.channels];
-                clip.GetData(_clipData, 0);
+                if (clip.loadState == AudioDataLoadState.Loaded)
+                {
+                    _sampleRate = AudioSettings.outputSampleRate;
+                    _clipData = new float[clip.samples * clip.channels];
+                    clip.GetData(_clipData, 0);
+                }
+                yield return null;
             }
-            yield return null;
+            if (playWhenReady)
+            {
+                Play();
+            }
         }
-        if (playWhenReady)
+        else Debug.LogWarning("Audio Clip can not be null.");
+    }
+
+    public override void Mute(bool isMuted)
+    {
+        if (isMuted && fadeOutDuration > 0 && fadeWhen.IsFlagSet(FadeTarget.Mute))
         {
-            Play();
+            _fadeTarget = FadeTarget.Mute;
+            FadeOut();
         }
+        else if (!isMuted && fadeInDuration > 0 && fadeWhen.IsFlagSet(FadeTarget.UnMute))
+        {
+            _fadeTarget = FadeTarget.UnMute;
+            FadeIn();
+        }
+        else
+        {
+            _audioSource.volume = isMuted ? 0 : _initialVolumeValue;
+            _fadeProgress = 1;
+            MuteInternal(isMuted);
+        }
+    }
+
+    private void FadeIn()
+    {
+        _fadeSpeed = 1f / fadeInDuration;
+        _fadeProgress = 0;
+        MuteInternal(false);
+        _volumeBeforeFade = _audioSource.volume;
+        _volumeAfterFade = _initialVolumeValue;
+    }
+
+    private void FadeOut()
+    {
+        _fadeSpeed = 1f / fadeOutDuration;
+        _fadeProgress = 0;
+        _volumeBeforeFade = _audioSource.volume;
+        _volumeAfterFade = 0;
+    }
+
+    private void MuteInternal(bool isMuted)
+    {
+        base.Mute(isMuted);
+#if UNITY_EDITOR
+        _isMutedOld = this.isMuted;
+#endif
     }
 
     /// <summary>
@@ -168,8 +282,29 @@ internal class Sequencer : SequencerBase
     /// </summary>
     public override void Play()
     {
+        if (!IsPlaying && fadeInDuration > 0 && fadeWhen.IsFlagSet(FadeTarget.Play))
+        {
+            _fadeTarget = FadeTarget.Play;
+            PlayInternal();
+            FadeIn();
+        }
+        else
+        {
+            _audioSource.volume = isMuted ? 0 : _initialVolumeValue;
+            _fadeProgress = 1;
+            PlayInternal();
+        }
+    }
+
+    private void PlayInternal()
+    {
         _nextTick = AudioSettings.dspTime * _sampleRate;
-        GetComponent<AudioSource>().Play();
+        if (_clipData == null)
+        {
+            _clipData = new float[clip.samples * clip.channels];
+            clip.GetData(_clipData, 0);
+        }
+        _audioSource.Play();
         _isPlaying = true;
     }
 
@@ -178,10 +313,26 @@ internal class Sequencer : SequencerBase
     /// </summary>
     public override void Stop()
     {
-        GetComponent<AudioSource>().Stop();
+        if (IsPlaying && fadeOutDuration > 0 && fadeWhen.IsFlagSet(FadeTarget.Stop))
+        {
+            _fadeTarget = FadeTarget.Stop;
+            FadeOut();
+        }
+        else
+        {
+            _audioSource.volume = isMuted ? 0 : _initialVolumeValue;
+            _fadeProgress = 1;
+            StopInternal();
+        }
+    }
+
+    private void StopInternal()
+    {
+        _audioSource.Stop();
         _isPlaying = false;
         _clipData = null;
         _index = 0;
+        _currentStep = 0;
         if (_backBuffer != null) _backBuffer.Clear();
     }
 
@@ -191,16 +342,35 @@ internal class Sequencer : SequencerBase
     /// <param name="pause"></param>
     public override void Pause(bool pause)
     {
-        if (pause)
+        if (pause && fadeOutDuration > 0 && fadeWhen.IsFlagSet(FadeTarget.Pause))
         {
-            GetComponent<AudioSource>().Pause();
-            _isPlaying = false;
-            _index = 0;
-            if (_backBuffer != null) _backBuffer.Clear();
+            _fadeTarget = FadeTarget.Pause;
+            FadeOut();
+        }
+        else if (!pause && fadeInDuration > 0 && fadeWhen.IsFlagSet(FadeTarget.UnPause))
+        {
+            _fadeTarget = FadeTarget.UnPause;
+            PauseInternal(false);
+            FadeIn();
         }
         else
         {
-            GetComponent<AudioSource>().UnPause();
+            _audioSource.volume = isMuted ? 0 : _initialVolumeValue;
+            _fadeProgress = 1;
+            PauseInternal(pause);
+        }
+    }
+
+    private void PauseInternal(bool pause)
+    {
+        if (pause)
+        {
+            _audioSource.Pause();
+            _isPlaying = false;
+        }
+        else
+        {
+            _audioSource.UnPause();
             _isPlaying = true;
         }
     }
@@ -253,6 +423,34 @@ internal class Sequencer : SequencerBase
         {
             _fireBeatEvent--;
             OnBeat();
+        }
+        if (_fadeProgress < 1)
+        {
+            _fadeProgress += Time.deltaTime * _fadeSpeed;
+            if (_fadeProgress > 1) _fadeProgress = 1;
+            _audioSource.volume = Mathf.Lerp(_volumeBeforeFade, _volumeAfterFade, _fadeProgress);
+            if (_fadeProgress == 1)
+            {
+                switch (_fadeTarget)
+                {
+                    case FadeTarget.Play:
+                    case FadeTarget.UnPause:
+                    case FadeTarget.UnMute:
+                        //Done on start of Fade.
+                        break;
+                    case FadeTarget.Stop:
+                        StopInternal();
+                        break;
+                    case FadeTarget.Mute:
+                        MuteInternal(true);
+                        break;
+                    case FadeTarget.Pause:
+                        PauseInternal(true);
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException();
+                }
+            }
         }
     }
 
@@ -356,7 +554,7 @@ internal class Sequencer : SequencerBase
                         _index = -1;
                     }
                     if (OnAnyStep != null) _fireAnyStepEvent++;
-                    if (log) Debug.Log("Tick: " + _currentStep + "/" + signatureHi + " (%" + GetPercentage() + ")");
+                    if (log) Debug.Log("Tick: " + _currentStep + " (%" + GetPercentage() + ")");
                 }
             }
         }
@@ -388,6 +586,29 @@ internal class Sequencer : SequencerBase
 
 
 #if UNITY_EDITOR
+
+    private bool _isMutedOld;
+    private int _oldBpm;
+
+    /// <summary>
+    /// Check and update when options are changed from editor.
+    /// </summary>
+    void LateUpdate()
+    {
+        if (IsReady)
+        {
+            if (_isMutedOld != isMuted)
+            {
+                _isMutedOld = isMuted;
+                Mute(isMuted);
+            }
+            if (_oldBpm != bpm)
+            {
+                _oldBpm = bpm;
+                SetBpm(bpm);
+            }
+        }
+    }
 
     [MenuItem("GameObject/Sequencer/Sequencer", false, 10)]
     static void CreateSequencerController(MenuCommand menuCommand)

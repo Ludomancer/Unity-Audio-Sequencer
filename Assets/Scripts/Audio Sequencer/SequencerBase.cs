@@ -30,17 +30,18 @@ SOFTWARE.
 
 using UnityEngine;
 using System.Collections.Generic;
- 
-public class SequencerBase : MonoBehaviour {
-   
+
+public class SequencerBase : MonoBehaviour
+{
+
     #region Enumerations
- 
+
     #endregion
- 
+
     #region Events and Delegates
- 
+
     #endregion
- 
+
     #region Variables
     /// <summary>
     /// Should the sequencer start playing automatically on Awake.
@@ -63,7 +64,7 @@ public class SequencerBase : MonoBehaviour {
     /// </summary>
     protected bool _isPlaying;
     #endregion
- 
+
     #region Properties
     /// <summary>
     /// Is playing.
@@ -82,8 +83,18 @@ public class SequencerBase : MonoBehaviour {
         get { return false; }
     }
     #endregion
- 
+
     #region Methods
+
+    private void Awake()
+    {
+        OnAwake();
+    }
+
+    public virtual void OnAwake()
+    {
+
+    }
 
     public virtual void Play()
     {

@@ -28,16 +28,17 @@ SOFTWARE.
 ************************************************************************************************************/
 #endregion
 
+using System.Runtime.CompilerServices;
 using System.Collections;
+using System;
 using UnityEngine;
 using System.Collections.Generic;
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
 
-public class SequencerGroup : SequencerBase
+internal class SequencerDriver : SequencerBase
 {
-
     #region Enumerations
 
     #endregion
@@ -48,11 +49,13 @@ public class SequencerGroup : SequencerBase
 
     #region Variables
 
-    private Sequencer[] _sequencers;
+    /// <summary>
+    /// Array of sequencers to be managed.
+    /// </summary>
+    public SequencerBase[] sequencers;
     #endregion
 
     #region Properties
-
     /// <summary>
     /// True if all connected sequencers has loaded their clips.
     /// </summary>
@@ -60,26 +63,24 @@ public class SequencerGroup : SequencerBase
     {
         get
         {
-            if (_sequencers == null) return false;
-            for (int i = 0; i < _sequencers.Length; i++)
+            if (sequencers == null) return false;
+            for (int i = 0; i < sequencers.Length; i++)
             {
-                if (!_sequencers[i].IsReady) return false;
+                if (!sequencers[i].IsReady) return false;
             }
             return true;
         }
     }
-
     #endregion
 
     #region Methods
 
-    private void Awake()
+    public override void OnAwake()
     {
 #if UNITY_EDITOR
         _isMutedOld = this.isMuted;
         _oldBpm = this.bpm;
 #endif
-        _sequencers = GetComponentsInChildren<Sequencer>();
         StartCoroutine(Init());
     }
 
@@ -103,12 +104,12 @@ public class SequencerGroup : SequencerBase
     {
         if (!IsPlaying)
         {
-            for (int i = 0; i < _sequencers.Length; i++)
+            for (int i = 0; i < sequencers.Length; i++)
             {
-                _sequencers[i].bpm = bpm;
-                _sequencers[i].Play();
+                sequencers[i].bpm = bpm;
+                sequencers[i].Play();
             }
-            IsPlaying = !IsPlaying;
+            IsPlaying = true;
         }
     }
 
@@ -129,11 +130,11 @@ public class SequencerGroup : SequencerBase
     {
         if (IsPlaying)
         {
-            for (int i = 0; i < _sequencers.Length; i++)
+            for (int i = 0; i < sequencers.Length; i++)
             {
-                _sequencers[i].Stop();
+                sequencers[i].Stop();
             }
-            IsPlaying = !IsPlaying;
+            IsPlaying = false;
         }
     }
 
@@ -145,9 +146,9 @@ public class SequencerGroup : SequencerBase
     {
         if ((IsPlaying && pause) || (!IsPlaying && !pause))
         {
-            for (int i = 0; i < _sequencers.Length; i++)
+            for (int i = 0; i < sequencers.Length; i++)
             {
-                _sequencers[i].Pause(pause);
+                sequencers[i].Pause(pause);
             }
             IsPlaying = !IsPlaying;
         }
@@ -159,12 +160,11 @@ public class SequencerGroup : SequencerBase
     /// <param name="isMuted"></param>
     public override void Mute(bool isMuted)
     {
-        for (int i = 0; i < _sequencers.Length; i++)
+        for (int i = 0; i < sequencers.Length; i++)
         {
-            _sequencers[i].Mute(isMuted);
+            sequencers[i].Mute(isMuted);
         }
         this.isMuted = isMuted;
-
 #if UNITY_EDITOR
         _isMutedOld = this.isMuted;
 #endif
@@ -177,12 +177,11 @@ public class SequencerGroup : SequencerBase
     /// <param name="percentage">Approximate percentage.</param>
     public override void SetPercentage(double percentage)
     {
-        for (int i = 0; i < _sequencers.Length; i++)
+        for (int i = 0; i < sequencers.Length; i++)
         {
-            _sequencers[i].SetPercentage(percentage);
+            sequencers[i].SetPercentage(percentage);
         }
     }
-
 
     /// <summary>
     /// Set Bpm of all connected sequencers.
@@ -192,15 +191,16 @@ public class SequencerGroup : SequencerBase
     {
         if (newBpm < 10) newBpm = 10;
         bpm = newBpm;
-        for (int i = 0; i < _sequencers.Length; i++)
+        for (int i = 0; i < sequencers.Length; i++)
         {
-            _sequencers[i].bpm = newBpm;
+            sequencers[i].bpm = newBpm;
         }
 
 #if UNITY_EDITOR
         _oldBpm = this.bpm;
 #endif
     }
+
 
 #if UNITY_EDITOR
 
@@ -216,7 +216,7 @@ public class SequencerGroup : SequencerBase
         {
             if (_isMutedOld != isMuted)
             {
-                print("Group changed " + _isMutedOld + ":" + isMuted);
+                print("Driver changed " + _isMutedOld + ":" + isMuted);
                 _isMutedOld = isMuted;
                 Mute(isMuted);
             }
@@ -228,24 +228,18 @@ public class SequencerGroup : SequencerBase
         }
     }
 
-    [MenuItem("GameObject/Sequencer/Sequencer Group", false, 10)]
+    [MenuItem("GameObject/Sequencer/Sequencer Driver", false, 10)]
     static void CreateSequencerController(MenuCommand menuCommand)
     {
         // Create a custom game object
-        GameObject go = new GameObject("Sequencer Group");
-        go.AddComponent<SequencerGroup>();
-        GameObject sequencer = new GameObject("Sequencer");
-        sequencer.AddComponent<AudioSource>().playOnAwake = false;
-        sequencer.AddComponent<Sequencer>();
-        GameObjectUtility.SetParentAndAlign(sequencer, go);
-        // Ensure it gets reparented if this was a context click (otherwise does nothing)
+        GameObject go = new GameObject("Sequencer Driver");
+        go.AddComponent<SequencerDriver>();
         GameObjectUtility.SetParentAndAlign(go, menuCommand.context as GameObject);
         // Register the creation in the undo system
         Undo.RegisterCreatedObjectUndo(go, "Create " + go.name);
         Selection.activeObject = go;
     }
 #endif
-
     #endregion
 
     #region Structs
