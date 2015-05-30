@@ -28,19 +28,24 @@ SOFTWARE.
 ************************************************************************************************************/
 #endregion
 
+using System;
 using UnityEngine;
 using System.Collections.Generic;
- 
-public class SequencerBase : MonoBehaviour {
-   
+
+public abstract class SequencerBase : MonoBehaviour
+{
+
     #region Enumerations
- 
+
     #endregion
- 
+
     #region Events and Delegates
- 
+    /// <summary>
+    /// Fired when Initialization is finished and module is ready to play.
+    /// </summary>
+    public Action OnReadyEvent;
     #endregion
- 
+
     #region Variables
     /// <summary>
     /// Should the sequencer start playing automatically on Awake.
@@ -63,7 +68,7 @@ public class SequencerBase : MonoBehaviour {
     /// </summary>
     protected bool _isPlaying;
     #endregion
- 
+
     #region Properties
     /// <summary>
     /// Is playing.
@@ -82,49 +87,49 @@ public class SequencerBase : MonoBehaviour {
         get { return false; }
     }
     #endregion
- 
+
     #region Methods
 
-    public virtual void Play()
+    private void Awake()
     {
-    }
-
-    public virtual void Play(double newPercentage)
-    {
-    }
-
-    public virtual void Stop()
-    {
-    }
-
-    public virtual void SetBpm(int newBpm)
-    {
-    }
-
-    public virtual void SetPercentage(double newPercentage)
-    {
-    }
-
-    public virtual void Pause(bool isPaused)
-    {
+        OnAwake();
     }
 
     /// <summary>
-    /// Mute/Unmute sequencer.
+    /// Called when Initialization is finished and module is ready to play.
     /// </summary>
-    /// <param name="isMuted"></param>
-    public virtual void Mute(bool isMuted)
+    protected virtual void OnReady()
     {
-        this.isMuted = isMuted;
+        if (OnReadyEvent != null) OnReadyEvent();
     }
 
-    /// <summary>
-    /// Toggle mute status.
-    /// </summary>
-    public virtual void ToggleMute()
-    {
-        Mute(!isMuted);
-    }
+    public abstract void OnAwake();
+
+    public abstract void Play();
+
+    public abstract void Play(double newPercentage);
+
+    public abstract void Play(float fadeDuration);
+
+    public abstract void Stop();
+
+    public abstract void Stop(float fadeDuration);
+
+    public abstract void SetBpm(int newBpm);
+
+    public abstract void SetPercentage(double newPercentage);
+
+    public abstract void Pause(bool isPaused);
+
+    public abstract void Pause(bool isPaused, float fadeDuration);
+
+    public abstract void Mute(bool isMuted);
+
+    public abstract void Mute(bool isMuted, float fadeDuration);
+
+    public abstract void SetFadeDurations(float fadeIn, float fadeOut);
+
+    public abstract void ToggleMute();
 
     #endregion
 

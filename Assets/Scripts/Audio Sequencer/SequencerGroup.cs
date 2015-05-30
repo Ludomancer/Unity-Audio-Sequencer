@@ -28,34 +28,31 @@ SOFTWARE.
 ************************************************************************************************************/
 #endregion
 
-using System.Runtime.CompilerServices;
-using System.Collections;
 using System;
+using System.Collections;
 using UnityEngine;
 using System.Collections.Generic;
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
 
-internal class SequencerDriver : SequencerBase
+public class SequencerGroup : SequencerBase
 {
+
     #region Enumerations
 
     #endregion
 
     #region Events and Delegates
-
     #endregion
 
     #region Variables
 
-    /// <summary>
-    /// Array of sequencers to be managed.
-    /// </summary>
-    public SequencerBase[] sequencers;
+    private Sequencer[] _sequencers;
     #endregion
 
     #region Properties
+
     /// <summary>
     /// True if all connected sequencers has loaded their clips.
     /// </summary>
@@ -63,24 +60,26 @@ internal class SequencerDriver : SequencerBase
     {
         get
         {
-            if (sequencers == null) return false;
-            for (int i = 0; i < sequencers.Length; i++)
+            if (_sequencers == null) return false;
+            for (int i = 0; i < _sequencers.Length; i++)
             {
-                if (!sequencers[i].IsReady) return false;
+                if (!_sequencers[i].IsReady) return false;
             }
             return true;
         }
     }
+
     #endregion
 
     #region Methods
 
-    private void Awake()
+    public override void OnAwake()
     {
 #if UNITY_EDITOR
         _isMutedOld = this.isMuted;
         _oldBpm = this.bpm;
 #endif
+        _sequencers = GetComponentsInChildren<Sequencer>();
         StartCoroutine(Init());
     }
 
@@ -95,6 +94,7 @@ internal class SequencerDriver : SequencerBase
         {
             Play();
         }
+        OnReady();
     }
 
     /// <summary>
@@ -104,12 +104,12 @@ internal class SequencerDriver : SequencerBase
     {
         if (!IsPlaying)
         {
-            for (int i = 0; i < sequencers.Length; i++)
+            for (int i = 0; i < _sequencers.Length; i++)
             {
-                sequencers[i].bpm = bpm;
-                sequencers[i].Play();
+                _sequencers[i].bpm = bpm;
+                _sequencers[i].Play();
             }
-            IsPlaying = !IsPlaying;
+            IsPlaying = true;
         }
     }
 
@@ -124,17 +124,64 @@ internal class SequencerDriver : SequencerBase
     }
 
     /// <summary>
+    /// Play all connected sequencers.
+    /// </summary>
+    /// <param name="fadeDuration"></param>
+    public override void Play(float fadeDuration)
+    {
+        if (!IsPlaying)
+        {
+            for (int i = 0; i < _sequencers.Length; i++)
+            {
+                _sequencers[i].bpm = bpm;
+                _sequencers[i].Play(fadeDuration);
+            }
+            IsPlaying = true;
+        }
+    }
+
+    /// <summary>
     /// Stop all connected sequencers.
     /// </summary>
     public override void Stop()
     {
         if (IsPlaying)
         {
-            GetComponent<AudioSource>().Stop();
-            _isPlaying = false;
-            for (int i = 0; i < sequencers.Length; i++)
+            for (int i = 0; i < _sequencers.Length; i++)
             {
-                sequencers[i].Stop();
+                _sequencers[i].Stop();
+            }
+            IsPlaying = false;
+        }
+    }
+
+    /// <summary>
+    /// Stop all connected sequencers.
+    /// </summary>
+    /// <param name="fadeDuration"></param>
+    public override void Stop(float fadeDuration)
+    {
+        if (IsPlaying)
+        {
+            for (int i = 0; i < _sequencers.Length; i++)
+            {
+                _sequencers[i].Stop(fadeDuration);
+            }
+            IsPlaying = false;
+        }
+    }
+
+    /// <summary>
+    /// Pause/Unpause all connected sequencers.
+    /// </summary>
+    /// <param name="isPaused"></param>
+    public override void Pause(bool isPaused)
+    {
+        if ((IsPlaying && isPaused) || (!IsPlaying && !isPaused))
+        {
+            for (int i = 0; i < _sequencers.Length; i++)
+            {
+                _sequencers[i].Pause(isPaused);
             }
             IsPlaying = !IsPlaying;
         }
@@ -143,17 +190,15 @@ internal class SequencerDriver : SequencerBase
     /// <summary>
     /// Pause/Unpause all connected sequencers.
     /// </summary>
-    /// <param name="pause"></param>
-    public override void Pause(bool pause)
+    /// <param name="isPaused"></param>
+    /// <param name="fadeDuration"></param>
+    public override void Pause(bool isPaused, float fadeDuration)
     {
-        if ((IsPlaying && pause) || (!IsPlaying && !pause))
+        if ((IsPlaying && isPaused) || (!IsPlaying && !isPaused))
         {
-            if (pause) GetComponent<AudioSource>().Pause();
-            else GetComponent<AudioSource>().UnPause();
-
-            for (int i = 0; i < sequencers.Length; i++)
+            for (int i = 0; i < _sequencers.Length; i++)
             {
-                sequencers[i].Pause(pause);
+                _sequencers[i].Pause(isPaused, fadeDuration);
             }
             IsPlaying = !IsPlaying;
         }
@@ -165,14 +210,55 @@ internal class SequencerDriver : SequencerBase
     /// <param name="isMuted"></param>
     public override void Mute(bool isMuted)
     {
-        for (int i = 0; i < sequencers.Length; i++)
+        for (int i = 0; i < _sequencers.Length; i++)
         {
-            sequencers[i].Mute(isMuted);
+            _sequencers[i].Mute(isMuted);
         }
         this.isMuted = isMuted;
+
 #if UNITY_EDITOR
         _isMutedOld = this.isMuted;
 #endif
+    }
+
+    /// <summary>
+    /// Mute/Unmute all connected sequencers.
+    /// </summary>
+    /// <param name="isMuted"></param>
+    /// <param name="fadeDuration"></param>
+    public override void Mute(bool isMuted, float fadeDuration)
+    {
+        for (int i = 0; i < _sequencers.Length; i++)
+        {
+            _sequencers[i].Mute(isMuted, fadeDuration);
+        }
+        this.isMuted = isMuted;
+
+#if UNITY_EDITOR
+        _isMutedOld = this.isMuted;
+#endif
+    }
+
+    /// <summary>
+    /// Changes default fade in and fade out durations of all connected sequencers.
+    /// </summary>
+    /// <param name="fadeIn"></param>
+    /// <param name="fadeOut"></param>
+    public override void SetFadeDurations(float fadeIn, float fadeOut)
+    {
+        for (int i = 0; i < _sequencers.Length; i++)
+        {
+            _sequencers[i].SetFadeDurations(fadeIn, fadeOut);
+        }
+    }
+
+    /// <summary>
+    ///  Toggle mute state.
+    /// </summary>
+    public override void ToggleMute()
+    {
+        isMuted = !isMuted;
+        Mute(isMuted);
     }
 
     /// <summary>
@@ -182,11 +268,12 @@ internal class SequencerDriver : SequencerBase
     /// <param name="percentage">Approximate percentage.</param>
     public override void SetPercentage(double percentage)
     {
-        for (int i = 0; i < sequencers.Length; i++)
+        for (int i = 0; i < _sequencers.Length; i++)
         {
-            sequencers[i].SetPercentage(percentage);
+            _sequencers[i].SetPercentage(percentage);
         }
     }
+
 
     /// <summary>
     /// Set Bpm of all connected sequencers.
@@ -196,16 +283,15 @@ internal class SequencerDriver : SequencerBase
     {
         if (newBpm < 10) newBpm = 10;
         bpm = newBpm;
-        for (int i = 0; i < sequencers.Length; i++)
+        for (int i = 0; i < _sequencers.Length; i++)
         {
-            sequencers[i].bpm = newBpm;
+            _sequencers[i].bpm = newBpm;
         }
 
 #if UNITY_EDITOR
         _oldBpm = this.bpm;
 #endif
     }
-
 
 #if UNITY_EDITOR
 
@@ -221,7 +307,6 @@ internal class SequencerDriver : SequencerBase
         {
             if (_isMutedOld != isMuted)
             {
-                print("Driver changed " + _isMutedOld + ":" + isMuted);
                 _isMutedOld = isMuted;
                 Mute(isMuted);
             }
@@ -233,18 +318,24 @@ internal class SequencerDriver : SequencerBase
         }
     }
 
-    [MenuItem("GameObject/Sequencer/Sequencer Driver", false, 10)]
+    [MenuItem("GameObject/Sequencer/Sequencer Group", false, 10)]
     static void CreateSequencerController(MenuCommand menuCommand)
     {
         // Create a custom game object
-        GameObject go = new GameObject("Sequencer Driver");
-        go.AddComponent<SequencerDriver>();
+        GameObject go = new GameObject("Sequencer Group");
+        go.AddComponent<SequencerGroup>();
+        GameObject sequencer = new GameObject("Sequencer");
+        sequencer.AddComponent<AudioSource>().playOnAwake = false;
+        sequencer.AddComponent<Sequencer>();
+        GameObjectUtility.SetParentAndAlign(sequencer, go);
+        // Ensure it gets reparented if this was a context click (otherwise does nothing)
         GameObjectUtility.SetParentAndAlign(go, menuCommand.context as GameObject);
         // Register the creation in the undo system
         Undo.RegisterCreatedObjectUndo(go, "Create " + go.name);
         Selection.activeObject = go;
     }
 #endif
+
     #endregion
 
     #region Structs
