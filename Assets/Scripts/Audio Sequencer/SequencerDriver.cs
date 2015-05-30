@@ -28,6 +28,7 @@ SOFTWARE.
 ************************************************************************************************************/
 #endregion
 
+using System;
 using System.Collections;
 using UnityEngine;
 #if UNITY_EDITOR
@@ -41,7 +42,6 @@ internal class SequencerDriver : SequencerBase
     #endregion
 
     #region Events and Delegates
-
     #endregion
 
     #region Variables
@@ -92,6 +92,7 @@ internal class SequencerDriver : SequencerBase
         {
             Play();
         }
+        OnReady();
     }
 
     /// <summary>

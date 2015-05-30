@@ -28,6 +28,7 @@ SOFTWARE.
 ************************************************************************************************************/
 #endregion
 
+using System;
 using System.Collections;
 using UnityEngine;
 using System.Collections.Generic;
@@ -43,7 +44,6 @@ public class SequencerGroup : SequencerBase
     #endregion
 
     #region Events and Delegates
-
     #endregion
 
     #region Variables
@@ -94,6 +94,7 @@ public class SequencerGroup : SequencerBase
         {
             Play();
         }
+        OnReady();
     }
 
     /// <summary>

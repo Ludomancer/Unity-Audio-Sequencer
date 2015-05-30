@@ -28,6 +28,7 @@ SOFTWARE.
 ************************************************************************************************************/
 #endregion
 
+using System;
 using UnityEngine;
 using System.Collections.Generic;
 
@@ -39,7 +40,10 @@ public abstract class SequencerBase : MonoBehaviour
     #endregion
 
     #region Events and Delegates
-
+    /// <summary>
+    /// Fired when Initialization is finished and module is ready to play.
+    /// </summary>
+    public Action OnReadyEvent;
     #endregion
 
     #region Variables
@@ -89,6 +93,14 @@ public abstract class SequencerBase : MonoBehaviour
     private void Awake()
     {
         OnAwake();
+    }
+
+    /// <summary>
+    /// Called when Initialization is finished and module is ready to play.
+    /// </summary>
+    protected virtual void OnReady()
+    {
+        if (OnReadyEvent != null) OnReadyEvent();
     }
 
     public abstract void OnAwake();

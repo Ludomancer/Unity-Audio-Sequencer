@@ -205,20 +205,20 @@ internal class Sequencer : SequencerBase
     private IEnumerator Init()
     {
         _audioSource = GetComponent<AudioSource>();
+        _initialVolumeValue = _audioSource.volume;
+        _volumeAfterFade = _initialVolumeValue;
+        _sampleRate = AudioSettings.outputSampleRate;
+        _audioSource.volume = 0;
         if (clip == null)
         {
             clip = _audioSource.clip;
         }
         if (clip != null)
         {
-            _initialVolumeValue = _audioSource.volume;
-            _volumeAfterFade = _initialVolumeValue;
-            _audioSource.volume = 0;
             while (_clipData == null)
             {
                 if (clip.loadState == AudioDataLoadState.Loaded)
                 {
-                    _sampleRate = AudioSettings.outputSampleRate;
                     _clipData = new float[clip.samples * clip.channels];
                     clip.GetData(_clipData, 0);
                 }
@@ -228,8 +228,20 @@ internal class Sequencer : SequencerBase
             {
                 Play();
             }
+            OnReady();
         }
         else Debug.LogWarning("Audio Clip can not be null.");
+    }
+
+    public void SetAudioClip(AudioClip newClip)
+    {
+        clip = newClip;
+        if (clip != null)
+        {
+            _clipData = new float[clip.samples * clip.channels];
+            clip.GetData(_clipData, 0);
+        }
+        else _clipData = null;
     }
 
     /// <summary>
@@ -364,12 +376,16 @@ internal class Sequencer : SequencerBase
 
     private void StopInternal()
     {
-        _audioSource.Stop();
         _isPlaying = false;
+        _audioSource.Stop();
         _clipData = null;
         _index = 0;
         _currentStep = 0;
-        if (_backBuffer != null) _backBuffer.Clear();
+        if (_backBuffer != null)
+        {
+            _backBuffer.Clear();
+            _backBuffer = null;
+        }
     }
 
     /// <summary>
