@@ -40,3 +40,11 @@ A precise audio sequencer for Unity3d
   ![Sequencer Driver](http://i.imgur.com/vLhppb2.png)
 * **Sequencer** can also be used without a **Sequncer Group** or **Sequencer Driver**
 ![Sequencer Only](http://i.imgur.com/uxSKPBf.png)
+
+### Changelog
+- **0.2**
+  - Audio channel support.
+  - BackBuffer pooling.
+  - Performance improvements.
+- **0.1**
+  - Initial features set.
