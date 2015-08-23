@@ -688,15 +688,16 @@ internal class Sequencer : SequencerBase
         {
             if (_index != -1 && _index < _clipData.Length)
             {
-				float[] newBackBuffer = new float[_clipData.Length - _index];
-                    for (int i = _index; i < _clipData.Length / _clipChannels; i++)
+                float[] newBackBuffer = new float[_clipData.Length - _index];
+                for (int i = _index; i < _clipData.Length / _clipChannels; i++)
+                {
+                    int clipChannel = 0;
+                    while (clipChannel < _clipChannels)
                     {
-                        int clipChannel = 0;
-                        while (clipChannel < _clipChannels)
-                        {
-                            newBackBuffer[(i - _index) * _clipChannels + clipChannel] = _clipData[i * _clipChannels + clipChannel];
-                            clipChannel++;
-                        }
+                        newBackBuffer[(i - _index) * _clipChannels + clipChannel] = _clipData[i * _clipChannels + clipChannel];
+                        clipChannel++;
+                    }
+                }
                 BackBuffer bb = BackBufferFactory();
                 if (bb)
                 {
