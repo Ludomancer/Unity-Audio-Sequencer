@@ -130,7 +130,7 @@ internal class Sequencer : SequencerBase
     /// <summary>
     /// List of backbuffers.
     /// </summary>
-    private List<BackBuffer> _backBuffer;
+    private List<BackBuffer> _activeBackBuffers;
     /// <summary>
     /// Remaining beat events to be fired.
     /// </summary>
@@ -175,6 +175,14 @@ internal class Sequencer : SequencerBase
     /// Attached audio source.
     /// </summary>
     private AudioSource _audioSource;
+    /// <summary>
+    /// Number of channels the audio clip has.
+    /// </summary>
+    private int _clipChannels;
+    /// <summary>
+    /// Re-use BackBuffer's instead of creating a new one everytime we need it.
+    /// </summary>
+    private List<BackBuffer> _backBufferPool;
     #endregion
 
     #region Properties
@@ -219,7 +227,8 @@ internal class Sequencer : SequencerBase
             {
                 if (clip.loadState == AudioDataLoadState.Loaded)
                 {
-                    _clipData = new float[clip.samples * clip.channels];
+                    _clipChannels = clip.channels;
+                    _clipData = new float[clip.samples * _clipChannels];
                     clip.GetData(_clipData, 0);
                 }
                 yield return null;
@@ -238,7 +247,8 @@ internal class Sequencer : SequencerBase
         clip = newClip;
         if (clip != null)
         {
-            _clipData = new float[clip.samples * clip.channels];
+            _clipChannels = clip.channels;
+            _clipData = new float[clip.samples * _clipChannels];
             clip.GetData(_clipData, 0);
         }
         else _clipData = null;
@@ -340,7 +350,8 @@ internal class Sequencer : SequencerBase
         _nextTick = AudioSettings.dspTime * _sampleRate;
         if (_clipData == null)
         {
-            _clipData = new float[clip.samples * clip.channels];
+            _clipChannels = clip.channels;
+            _clipData = new float[clip.samples * _clipChannels];
             clip.GetData(_clipData, 0);
         }
         _audioSource.Play();
@@ -381,10 +392,10 @@ internal class Sequencer : SequencerBase
         _clipData = null;
         _index = 0;
         _currentStep = 0;
-        if (_backBuffer != null)
+        if (_activeBackBuffers != null)
         {
-            _backBuffer.Clear();
-            _backBuffer = null;
+            _activeBackBuffers.Clear();
+            _activeBackBuffers = null;
         }
     }
 
@@ -488,7 +499,7 @@ internal class Sequencer : SequencerBase
     private void UpdatePercentage()
     {
         _index = 0;
-        if (_backBuffer != null) _backBuffer.Clear();
+        if (_activeBackBuffers != null) _activeBackBuffers.Clear();
 
         double samplesTotal = _sampleRate * 60.0F / bpm * 4.0F;
         double samplesPerTick = samplesTotal / signatureLo;
@@ -551,7 +562,7 @@ internal class Sequencer : SequencerBase
         bpm = newBpm;
     }
 
-    void OnAudioFilterRead(float[] data, int channels)
+    void OnAudioFilterRead(float[] bufferData, int bufferChannels)
     {
         if (!IsReady || !_isPlaying) return;
         double samplesPerTick = _sampleRate * 60.0F / bpm * 4.0F / signatureLo;
@@ -564,7 +575,7 @@ internal class Sequencer : SequencerBase
 
         if (isMuted)
         {
-            int dataLeft = data.Length;
+            int dataLeft = bufferData.Length;
             while (dataLeft > 0)
             {
                 double newSample = sample + dataLeft;
@@ -590,30 +601,50 @@ internal class Sequencer : SequencerBase
         }
         else
         {
-            for (int dataIndex = 0; dataIndex < data.Length; dataIndex++)
+            for (int dataIndex = 0; dataIndex < bufferData.Length / bufferChannels; dataIndex++)
             {
-                if (_backBuffer != null)
+                if (_activeBackBuffers != null)
                 {
-                    for (int backBufferIndex = 0; backBufferIndex < _backBuffer.Count; backBufferIndex++)
+                    for (int backBufferIndex = 0; backBufferIndex < _activeBackBuffers.Count; backBufferIndex++)
                     {
-                        data[dataIndex] += _backBuffer[backBufferIndex].data[_backBuffer[backBufferIndex].index];
+                        BackBuffer bb = _activeBackBuffers[backBufferIndex];
 
-                        _backBuffer[backBufferIndex].index += 1;
-                        if (_backBuffer[backBufferIndex].index >= _backBuffer[backBufferIndex].data.Length)
+                        int clipChannel = 0;
+                        int sourceChannel = 0;
+                        while (sourceChannel < bufferChannels)
                         {
-                            _backBuffer.RemoveAt(backBufferIndex);
+                            bufferData[dataIndex * bufferChannels + sourceChannel] += bb.data[bb.index * _clipChannels + clipChannel];
+
+                            sourceChannel++;
+                            clipChannel++;
+                            if (clipChannel == _clipChannels - 1) clipChannel = 0;
+                        }
+
+                        bb.index++;
+                        if (bb.index >= bb.data.Length / bufferChannels)
+                        {
+                            ReleaseBackBuffer(backBufferIndex);
                             backBufferIndex--;
-                            if (log) print("BackBuffer removed. Total: " + _backBuffer.Count);
+                            if (log) print("BackBuffer recycled. Total: " + _activeBackBuffers.Count);
                         }
                     }
                 }
 
                 if (_index != -1)
                 {
-                    data[dataIndex] += _clipData[_index];
+                    int clipChannel = 0;
+                    int sourceChannel = 0;
+                    while (sourceChannel < bufferChannels)
+                    {
+                        bufferData[dataIndex * bufferChannels + sourceChannel] += _clipData[_index * _clipChannels + clipChannel];
+
+                        sourceChannel++;
+                        clipChannel++;
+                        if (clipChannel == _clipChannels - 1) clipChannel = 0;
+                    }
 
                     _index++;
-                    if (_index >= _clipData.Length)
+                    if (_index >= _clipData.Length / _clipChannels)
                     {
                         _index = -1;
                     }
@@ -624,7 +655,8 @@ internal class Sequencer : SequencerBase
                 if (sample + dataIndex >= _nextTick)
                 {
                     //Refactored to increase readability.
-                    AddToBackBuffer();
+                    AddToBackBuffer(bufferChannels);
+
                     _nextTick += samplesPerTick;
                     if (++_currentStep > signatureLo)
                     {
@@ -650,25 +682,81 @@ internal class Sequencer : SequencerBase
     /// <summary>
     /// Add remaining audio data to back buffer to be played in next audio thread cycles.
     /// </summary>
-    private void AddToBackBuffer()
+    private void AddToBackBuffer(int channels)
     {
         if (maxBackBufferSize > 0)
         {
             if (_index != -1 && _index < _clipData.Length)
             {
-                if (_backBuffer == null) _backBuffer = new List<BackBuffer>(increaseBackBufferBy);
-                else if (_backBuffer.Count != maxBackBufferSize)
+                float[] newBackBuffer = new float[_clipData.Length - _index];
+                for (int i = _index; i < _clipData.Length / _clipChannels; i++)
                 {
-                    if (_backBuffer.Count == _backBuffer.Capacity) _backBuffer.Capacity += increaseBackBufferBy;
-                    float[] newBackBuffer = new float[_clipData.Length - _index];
-                    for (int i = _index; i < _clipData.Length; i++) newBackBuffer[i - _index] = _clipData[i];
-                    _backBuffer.Add(new BackBuffer(newBackBuffer));
+                    int clipChannel = 0;
+                    while (clipChannel < _clipChannels)
+                    {
+                        newBackBuffer[(i - _index) * _clipChannels + clipChannel] = _clipData[i * _clipChannels + clipChannel];
+                        clipChannel++;
+                    }
+                }
+                BackBuffer bb = BackBufferFactory();
+                if (bb)
+                {
+                    bb.SetData(newBackBuffer);
                     if (log)
                         print("New BackBuffer[" + newBackBuffer.Length + "] added. Total: " +
-                              _backBuffer.Count + "/" + _backBuffer.Capacity);
+                              _activeBackBuffers.Count + "/" + _activeBackBuffers.Capacity);
                 }
             }
         }
+    }
+
+    BackBuffer BackBufferFactory()
+    {
+        BackBuffer bb = null;
+
+        if (_activeBackBuffers == null && maxBackBufferSize > 0 && increaseBackBufferBy > 0) _activeBackBuffers = new List<BackBuffer>(increaseBackBufferBy);
+        if (_activeBackBuffers != null && _activeBackBuffers.Count < maxBackBufferSize)
+        {
+            if (_activeBackBuffers.Count == _activeBackBuffers.Capacity)
+            {
+                int newCap = _activeBackBuffers.Capacity + increaseBackBufferBy;
+                if (newCap > maxBackBufferSize) newCap = maxBackBufferSize;
+                _activeBackBuffers.Capacity = newCap;
+            }
+
+            if (_backBufferPool != null && _backBufferPool.Count > 0)
+            {
+                bb = _backBufferPool[0];
+                _backBufferPool.RemoveAt(0);
+            }
+            else
+            {
+                bb = new BackBuffer();
+            }
+
+            _activeBackBuffers.Add(bb);
+        }
+
+        return bb;
+    }
+
+    void ReleaseBackBuffer(int bbIndex)
+    {
+        BackBuffer bb = _activeBackBuffers[bbIndex];
+        _activeBackBuffers.RemoveAt(bbIndex);
+        bb.ClearData();
+
+        if (_backBufferPool == null) _backBufferPool = new List<BackBuffer>();
+        _backBufferPool.Add(bb);
+    }
+
+    void ReleaseBackBuffer(BackBuffer bb)
+    {
+        _activeBackBuffers.Remove(bb);
+        bb.ClearData();
+
+        if (_backBufferPool == null) _backBufferPool = new List<BackBuffer>();
+        _backBufferPool.Add(bb);
     }
 
 
@@ -716,9 +804,23 @@ internal class Sequencer : SequencerBase
     #region Structs
     public class BackBuffer
     {
+        public BackBuffer() { }
+
         public BackBuffer(float[] data)
         {
             this.data = data;
+            this.index = 0;
+        }
+
+        public void SetData(float[] data)
+        {
+            this.data = data;
+            index = 0;
+        }
+
+        public void ClearData()
+        {
+            data = null;
             index = 0;
         }
 
@@ -729,7 +831,12 @@ internal class Sequencer : SequencerBase
         /// <summary>
         /// Current index of data.
         /// </summary>
-        public int index;
+        public int index = 0;
+
+        public static implicit operator bool (BackBuffer bb)
+        {
+            return !ReferenceEquals(bb, null);
+        }
     }
 
     #endregion
