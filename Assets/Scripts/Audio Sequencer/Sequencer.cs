@@ -175,6 +175,10 @@ internal class Sequencer : SequencerBase
     /// Attached audio source.
     /// </summary>
     private AudioSource _audioSource;
+    /// <summary>
+    /// Number of channels the audio clip has.
+    /// </summary>
+    private int _clipChannels;
     #endregion
 
     #region Properties
@@ -219,7 +223,8 @@ internal class Sequencer : SequencerBase
             {
                 if (clip.loadState == AudioDataLoadState.Loaded)
                 {
-                    _clipData = new float[clip.samples * clip.channels];
+                    _clipChannels = clip.channels;
+                    _clipData = new float[clip.samples * _clipChannels];
                     clip.GetData(_clipData, 0);
                 }
                 yield return null;
@@ -238,7 +243,8 @@ internal class Sequencer : SequencerBase
         clip = newClip;
         if (clip != null)
         {
-            _clipData = new float[clip.samples * clip.channels];
+            _clipChannels = clip.channels;
+            _clipData = new float[clip.samples * _clipChannels];
             clip.GetData(_clipData, 0);
         }
         else _clipData = null;
@@ -340,7 +346,8 @@ internal class Sequencer : SequencerBase
         _nextTick = AudioSettings.dspTime * _sampleRate;
         if (_clipData == null)
         {
-            _clipData = new float[clip.samples * clip.channels];
+            _clipChannels = clip.channels;
+            _clipData = new float[clip.samples * _clipChannels];
             clip.GetData(_clipData, 0);
         }
         _audioSource.Play();
@@ -590,16 +597,27 @@ internal class Sequencer : SequencerBase
         }
         else
         {
-            for (int dataIndex = 0; dataIndex < data.Length; dataIndex++)
+            for (int dataIndex = 0; dataIndex < data.Length / channels; dataIndex++)
             {
                 if (_backBuffer != null)
                 {
                     for (int backBufferIndex = 0; backBufferIndex < _backBuffer.Count; backBufferIndex++)
                     {
-                        data[dataIndex] += _backBuffer[backBufferIndex].data[_backBuffer[backBufferIndex].index];
+                        BackBuffer bb = _backBuffer[backBufferIndex];
 
-                        _backBuffer[backBufferIndex].index += 1;
-                        if (_backBuffer[backBufferIndex].index >= _backBuffer[backBufferIndex].data.Length)
+                        int clipChannel = 0;
+                        int sourceChannel = 0;
+                        while (sourceChannel < channels)
+                        {
+                            data[dataIndex * channels + sourceChannel] += bb.data[bb.index * _clipChannels + clipChannel];
+
+                            sourceChannel++;
+                            clipChannel++;
+                            if (clipChannel == _clipChannels - 1) clipChannel = 0;
+                        }
+
+                        bb.index++;
+                        if (bb.index >= bb.data.Length / channels)
                         {
                             _backBuffer.RemoveAt(backBufferIndex);
                             backBufferIndex--;
@@ -610,10 +628,19 @@ internal class Sequencer : SequencerBase
 
                 if (_index != -1)
                 {
-                    data[dataIndex] += _clipData[_index];
+                    int clipChannel = 0;
+                    int sourceChannel = 0;
+                    while (sourceChannel < channels)
+                    {
+                        data[dataIndex * channels + sourceChannel] += _clipData[_index * _clipChannels + clipChannel];
+
+                        sourceChannel++;
+                        clipChannel++;
+                        if (clipChannel == _clipChannels - 1) clipChannel = 0;
+                    }
 
                     _index++;
-                    if (_index >= _clipData.Length)
+                    if (_index >= _clipData.Length / channels)
                     {
                         _index = -1;
                     }
@@ -624,7 +651,7 @@ internal class Sequencer : SequencerBase
                 if (sample + dataIndex >= _nextTick)
                 {
                     //Refactored to increase readability.
-                    AddToBackBuffer();
+                    AddToBackBuffer(channels);
                     _nextTick += samplesPerTick;
                     if (++_currentStep > signatureLo)
                     {
@@ -650,7 +677,7 @@ internal class Sequencer : SequencerBase
     /// <summary>
     /// Add remaining audio data to back buffer to be played in next audio thread cycles.
     /// </summary>
-    private void AddToBackBuffer()
+    private void AddToBackBuffer(int channels)
     {
         if (maxBackBufferSize > 0)
         {
@@ -661,7 +688,11 @@ internal class Sequencer : SequencerBase
                 {
                     if (_backBuffer.Count == _backBuffer.Capacity) _backBuffer.Capacity += increaseBackBufferBy;
                     float[] newBackBuffer = new float[_clipData.Length - _index];
-                    for (int i = _index; i < _clipData.Length; i++) newBackBuffer[i - _index] = _clipData[i];
+                    int dataLenght = _clipData.Length / channels;
+                    for (int i = _index; i < dataLenght; i++)
+                    {
+                        newBackBuffer[(i - _index)] += _clipData[i];
+                    }
                     _backBuffer.Add(new BackBuffer(newBackBuffer));
                     if (log)
                         print("New BackBuffer[" + newBackBuffer.Length + "] added. Total: " +
