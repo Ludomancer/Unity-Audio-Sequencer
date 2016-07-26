@@ -57,25 +57,34 @@ internal class Sequencer : SequencerBase
     #endregion
 
     #region Events and Delegates
+
+    public delegate void OnStep(int currentBeat, int numberOfBeats);
+
     /// <summary>
     /// Event to be fired on non-empty steps.
     /// </summary>
-    public Action OnBeat;
+    public OnStep onBeat;
     /// <summary>
     /// Event to be fired on every step.
     /// </summary>
-    public Action OnAnyStep;
+    public OnStep onAnyStep;
     #endregion
 
     #region Variables
+
+    /// <summary>
+    /// Queues events to be fired make sure we are not missing any of them. Only created if the event is used.
+    /// </summary>
+    private Queue<Action> _onBeatEventQueue;
+    /// <summary>
+    /// Queues events to be fired make sure we are not missing any of them. Only created if the event is used.
+    /// </summary>
+    private Queue<Action> _onAnyStepEventQueue;
+
     /// <summary>
     /// Audio clip to be played by this sequencer.
     /// </summary>
     public AudioClip clip;
-    /// <summary>
-    /// Low signature.
-    /// </summary>
-    public int signatureLo = 4;
     /// <summary>
     /// Sequence of steps.
     /// True = Play
@@ -193,6 +202,23 @@ internal class Sequencer : SequencerBase
     {
         get { return _clipData != null; }
     }
+
+    /// <summary>
+    /// Current step.
+    /// </summary>
+    public int CurrentStep
+    {
+        get { return _currentStep; }
+    }
+
+    /// <summary>
+    /// Signature Lenght
+    /// </summary>
+    public int NumberOfBeats
+    {
+        get { return sequence.Length; }
+    }
+
     #endregion
 
     #region Methods
@@ -502,7 +528,7 @@ internal class Sequencer : SequencerBase
         if (_activeBackBuffers != null) _activeBackBuffers.Clear();
 
         double samplesTotal = _sampleRate * 60.0F / bpm * 4.0F;
-        double samplesPerTick = samplesTotal / signatureLo;
+        double samplesPerTick = samplesTotal / NumberOfBeats;
         double newSamplePos = samplesTotal * _newPercentage;
         double currentTickDouble = newSamplePos / samplesPerTick;
         _currentStep = (int)Math.Round(currentTickDouble, MidpointRounding.ToEven);
@@ -512,15 +538,19 @@ internal class Sequencer : SequencerBase
 
     private void Update()
     {
-        while (_fireAnyStepEvent > 0)
+        if (_onAnyStepEventQueue != null)
         {
-            _fireAnyStepEvent--;
-            OnAnyStep();
+            while (_onAnyStepEventQueue.Count > 0)
+            {
+                _onAnyStepEventQueue.Dequeue().Invoke();
+            }
         }
-        while (_fireBeatEvent > 0)
+        if (_onBeatEventQueue != null)
         {
-            _fireBeatEvent--;
-            OnBeat();
+            while (_onBeatEventQueue.Count > 0)
+            {
+                _onBeatEventQueue.Dequeue().Invoke();
+            }
         }
         if (_fadeProgress < 1)
         {
@@ -565,7 +595,7 @@ internal class Sequencer : SequencerBase
     void OnAudioFilterRead(float[] bufferData, int bufferChannels)
     {
         if (!IsReady || !_isPlaying) return;
-        double samplesPerTick = _sampleRate * 60.0F / bpm * 4.0F / signatureLo;
+        double samplesPerTick = _sampleRate * 60.0F / bpm * 4.0F / NumberOfBeats;
         double sample = AudioSettings.dspTime * _sampleRate;
         if (_newPercentage > -1)
         {
@@ -583,18 +613,18 @@ internal class Sequencer : SequencerBase
                 {
                     dataLeft = (int)(newSample - _nextTick);
                     _nextTick += samplesPerTick;
-                    if (++_currentStep > signatureLo) _currentStep = 1;
+                    if (++_currentStep > NumberOfBeats) _currentStep = 1;
                     _progress = _currentStep * samplesPerTick;
                     if (sequence[_currentStep - 1])
                     {
                         _index = 0;
-                        if (OnBeat != null) _fireBeatEvent++;
+                        if (onBeat != null) _fireBeatEvent++;
                     }
                     else
                     {
                         _index = -1;
                     }
-                    if (OnAnyStep != null) _fireAnyStepEvent++;
+                    if (onAnyStep != null) _fireAnyStepEvent++;
                 }
                 else break;
             }
@@ -658,7 +688,7 @@ internal class Sequencer : SequencerBase
                     AddToBackBuffer(bufferChannels);
 
                     _nextTick += samplesPerTick;
-                    if (++_currentStep > signatureLo)
+                    if (++_currentStep > NumberOfBeats)
                     {
                         _currentStep = 1;
                     }
@@ -666,13 +696,21 @@ internal class Sequencer : SequencerBase
                     if (sequence[_currentStep - 1])
                     {
                         _index = 0;
-                        if (OnBeat != null) _fireBeatEvent++;
+                        if (onBeat != null)
+                        {
+                            if (_onBeatEventQueue == null) _onBeatEventQueue = new Queue<Action>();
+                            _onBeatEventQueue.Enqueue(() => onBeat(_currentStep, NumberOfBeats));
+                        }
                     }
                     else
                     {
                         _index = -1;
                     }
-                    if (OnAnyStep != null) _fireAnyStepEvent++;
+                    if (onAnyStep != null)
+                    {
+                        if (_onAnyStepEventQueue == null) _onAnyStepEventQueue = new Queue<Action>();
+                        _onAnyStepEventQueue.Enqueue(() => onAnyStep(_currentStep, NumberOfBeats));
+                    }
                     if (log) Debug.Log("Tick: " + _currentStep + " (%" + GetPercentage() + ")");
                 }
             }
@@ -833,7 +871,7 @@ internal class Sequencer : SequencerBase
         /// </summary>
         public int index = 0;
 
-        public static implicit operator bool (BackBuffer bb)
+        public static implicit operator bool(BackBuffer bb)
         {
             return !ReferenceEquals(bb, null);
         }
