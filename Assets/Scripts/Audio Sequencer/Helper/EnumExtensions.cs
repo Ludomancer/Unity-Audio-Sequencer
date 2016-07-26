@@ -4,12 +4,15 @@ using System.Linq;
 
 public static class EnumExtensions
 {
+    #region Other Members
+
     private static void CheckEnumWithFlags<T>()
     {
-        if (!typeof(T).IsEnum)
-            throw new ArgumentException(string.Format("Type '{0}' is not an enum", typeof(T).FullName));
-        if (!Attribute.IsDefined(typeof(T), typeof(FlagsAttribute)))
-            throw new ArgumentException(string.Format("Type '{0}' doesn't have the 'Flags' attribute", typeof(T).FullName));
+        if (!typeof (T).IsEnum)
+            throw new ArgumentException(string.Format("Type '{0}' is not an enum", typeof (T).FullName));
+        if (!Attribute.IsDefined(typeof (T), typeof (FlagsAttribute)))
+            throw new ArgumentException(string.Format("Type '{0}' doesn't have the 'Flags' attribute",
+                typeof (T).FullName));
     }
 
     public static bool IsFlagSet<T>(this T value, T flag) where T : struct
@@ -23,7 +26,7 @@ public static class EnumExtensions
     public static IEnumerable<T> GetFlags<T>(this T value) where T : struct
     {
         CheckEnumWithFlags<T>();
-        foreach (T flag in Enum.GetValues(typeof(T)).Cast<T>())
+        foreach (T flag in Enum.GetValues(typeof (T)).Cast<T>())
         {
             if (value.IsFlagSet(flag))
                 yield return flag;
@@ -43,7 +46,7 @@ public static class EnumExtensions
         {
             lValue &= (~lFlag);
         }
-        return (T)Enum.ToObject(typeof(T), lValue);
+        return (T)Enum.ToObject(typeof (T), lValue);
     }
 
     public static T SetFlags<T>(this T value, T flags) where T : struct
@@ -65,6 +68,8 @@ public static class EnumExtensions
             long lFlag = Convert.ToInt64(flag);
             lValue |= lFlag;
         }
-        return (T)Enum.ToObject(typeof(T), lValue);
+        return (T)Enum.ToObject(typeof (T), lValue);
     }
+
+    #endregion
 }

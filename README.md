@@ -42,6 +42,9 @@ A precise audio sequencer for Unity3d
 ![Sequencer Only](http://i.imgur.com/uxSKPBf.png)
 
 ### Changelog
+- **0.3**
+  - CurrentStep and NumberOfSteps added for position tracking.
+  - CurrentStep and NumberOfSteps are now included in onAnyStep and onBeat events.
 - **0.2**
   - Audio channel support.
   - BackBuffer pooling.

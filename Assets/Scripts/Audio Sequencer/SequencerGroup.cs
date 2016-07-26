@@ -1,12 +1,16 @@
 ﻿#region Author
+
 /************************************************************************************************************
 Author: Nidre (Erdin Kacan)
 Website: http://erdinkacan.tumblr.com/
 GitHub: https://github.com/Nidre
 Behance : https://www.behance.net/erdinkacan
 ************************************************************************************************************/
+
 #endregion
+
 #region Copyright
+
 /************************************************************************************************************
 The MIT License (MIT)
 Copyright (c) 2015 Erdin
@@ -26,29 +30,26 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ************************************************************************************************************/
+
 #endregion
 
-using System;
 using System.Collections;
 using UnityEngine;
-using System.Collections.Generic;
 #if UNITY_EDITOR
 using UnityEditor;
+
 #endif
 
 public class SequencerGroup : SequencerBase
 {
-
-    #region Enumerations
-
-    #endregion
-
-    #region Events and Delegates
-    #endregion
+    #region Fields
 
     #region Variables
 
     private Sequencer[] _sequencers;
+
+    #endregion
+
     #endregion
 
     #region Properties
@@ -71,13 +72,17 @@ public class SequencerGroup : SequencerBase
 
     #endregion
 
+    #region Enumerations
+
+    #endregion
+
     #region Methods
 
     public override void OnAwake()
     {
 #if UNITY_EDITOR
-        _isMutedOld = this.isMuted;
-        _oldBpm = this.bpm;
+        _isMutedOld = isMuted;
+        _oldBpm = bpm;
 #endif
         _sequencers = GetComponentsInChildren<Sequencer>();
         StartCoroutine(Init());
@@ -289,7 +294,7 @@ public class SequencerGroup : SequencerBase
         }
 
 #if UNITY_EDITOR
-        _oldBpm = this.bpm;
+        _oldBpm = bpm;
 #endif
     }
 

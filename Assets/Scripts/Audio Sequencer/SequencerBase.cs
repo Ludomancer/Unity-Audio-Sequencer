@@ -1,12 +1,16 @@
 ﻿#region Author
+
 /************************************************************************************************************
 Author: Nidre (Erdin Kacan)
 Website: http://erdinkacan.tumblr.com/
 GitHub: https://github.com/Nidre
 Behance : https://www.behance.net/erdinkacan
 ************************************************************************************************************/
+
 #endregion
+
 #region Copyright
+
 /************************************************************************************************************
 The MIT License (MIT)
 Copyright (c) 2015 Erdin
@@ -26,50 +30,25 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ************************************************************************************************************/
+
 #endregion
 
 using System;
 using UnityEngine;
-using System.Collections.Generic;
 
 public abstract class SequencerBase : MonoBehaviour
 {
+    #region Fields
 
-    #region Enumerations
-
-    #endregion
-
-    #region Events and Delegates
     /// <summary>
     /// Fired when Initialization is finished and module is ready to play.
     /// </summary>
     public Action OnReadyEvent;
-    #endregion
 
-    #region Variables
-    /// <summary>
-    /// Should the sequencer start playing automatically on Awake.
-    /// </summary>
-    public bool playWhenReady;
-    /// <summary>
-    /// Beats per minute. Use SetBpm to change Bpm programmatically.
-    /// </summary>
-    public int bpm;
-    /// <summary>
-    /// Print logs.
-    /// </summary>
-    public bool log;
-    /// <summary>
-    /// Is sequencer muted or not. Sequncer will continue counting steps. Use SetMuted or ToggleMute to change Bpm programmatically.
-    /// </summary>
-    public bool isMuted;
-    /// <summary>
-    /// Is playing. 
-    /// </summary>
-    protected bool _isPlaying;
     #endregion
 
     #region Properties
+
     /// <summary>
     /// Is playing.
     /// </summary>
@@ -86,6 +65,40 @@ public abstract class SequencerBase : MonoBehaviour
     {
         get { return false; }
     }
+
+    #endregion
+
+    #region Enumerations
+
+    #endregion
+
+    #region Variables
+
+    /// <summary>
+    /// Should the sequencer start playing automatically on Awake.
+    /// </summary>
+    public bool playWhenReady;
+
+    /// <summary>
+    /// Beats per minute. Use SetBpm to change Bpm programmatically.
+    /// </summary>
+    public int bpm;
+
+    /// <summary>
+    /// Print logs.
+    /// </summary>
+    public bool log;
+
+    /// <summary>
+    /// Is sequencer muted or not. Sequncer will continue counting steps. Use SetMuted or ToggleMute to change Bpm programmatically.
+    /// </summary>
+    public bool isMuted;
+
+    /// <summary>
+    /// Is playing. 
+    /// </summary>
+    protected bool _isPlaying;
+
     #endregion
 
     #region Methods

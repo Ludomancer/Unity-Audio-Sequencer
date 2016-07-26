@@ -1,12 +1,16 @@
 ﻿#region Author
+
 /************************************************************************************************************
 Author: Nidre (Erdin Kacan)
 Website: http://erdinkacan.tumblr.com/
 GitHub: https://github.com/Nidre
 Behance : https://www.behance.net/erdinkacan
 ************************************************************************************************************/
+
 #endregion
+
 #region Copyright
+
 /************************************************************************************************************
 The MIT License (MIT)
 Copyright (c) 2015 Erdin
@@ -26,23 +30,19 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ************************************************************************************************************/
+
 #endregion
 
-using System;
 using System.Collections;
 using UnityEngine;
 #if UNITY_EDITOR
 using UnityEditor;
+
 #endif
 
 internal class SequencerDriver : SequencerBase
 {
-    #region Enumerations
-
-    #endregion
-
-    #region Events and Delegates
-    #endregion
+    #region Fields
 
     #region Variables
 
@@ -50,9 +50,13 @@ internal class SequencerDriver : SequencerBase
     /// Array of sequencers to be managed.
     /// </summary>
     public SequencerBase[] sequencers;
+
+    #endregion
+
     #endregion
 
     #region Properties
+
     /// <summary>
     /// True if all connected sequencers has loaded their clips.
     /// </summary>
@@ -68,6 +72,11 @@ internal class SequencerDriver : SequencerBase
             return true;
         }
     }
+
+    #endregion
+
+    #region Enumerations
+
     #endregion
 
     #region Methods
@@ -75,8 +84,8 @@ internal class SequencerDriver : SequencerBase
     public override void OnAwake()
     {
 #if UNITY_EDITOR
-        _isMutedOld = this.isMuted;
-        _oldBpm = this.bpm;
+        _isMutedOld = isMuted;
+        _oldBpm = bpm;
 #endif
         StartCoroutine(Init());
     }
@@ -244,7 +253,7 @@ internal class SequencerDriver : SequencerBase
     {
         for (int i = 0; i < sequencers.Length; i++)
         {
-            sequencers[i].SetFadeDurations(fadeIn,fadeOut);
+            sequencers[i].SetFadeDurations(fadeIn, fadeOut);
         }
     }
 
@@ -284,7 +293,7 @@ internal class SequencerDriver : SequencerBase
         }
 
 #if UNITY_EDITOR
-        _oldBpm = this.bpm;
+        _oldBpm = bpm;
 #endif
     }
 
@@ -327,6 +336,7 @@ internal class SequencerDriver : SequencerBase
         Selection.activeObject = go;
     }
 #endif
+
     #endregion
 
     #region Structs

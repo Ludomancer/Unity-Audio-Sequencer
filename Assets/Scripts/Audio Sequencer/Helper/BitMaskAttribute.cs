@@ -2,7 +2,7 @@
 
 public class BitMaskAttribute : PropertyAttribute
 {
-    public BitMaskAttribute()
-    {
-    }
+    #region Other Members
+
+    #endregion
 }
