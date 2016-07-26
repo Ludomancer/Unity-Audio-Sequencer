@@ -1,12 +1,16 @@
 ﻿#region Author
+
 /************************************************************************************************************
 Author: Nidre (Erdin Kacan)
 Website: http://erdinkacan.tumblr.com/
 GitHub: https://github.com/Nidre
 Behance : https://www.behance.net/erdinkacan
 ************************************************************************************************************/
+
 #endregion
+
 #region Copyright
+
 /************************************************************************************************************
 The MIT License (MIT)
 Copyright (c) 2015 Erdin
@@ -26,20 +30,28 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ************************************************************************************************************/
+
 #endregion
 
-using UnityEngine.UI;
-using System.Collections;
 using System;
-using UnityEngine;
+using System.Collections;
 using System.Collections.Generic;
+using UnityEngine;
 #if UNITY_EDITOR
 using UnityEditor;
+
 #endif
 
-[RequireComponent(typeof(AudioSource))]
+[RequireComponent(typeof (AudioSource))]
 internal class Sequencer : SequencerBase
 {
+    #region Delegates
+
+    public delegate void OnStep(int currentBeat, int numberOfBeats);
+
+    #endregion
+
+    #region FadeTarget enum
 
     #region Enumerations
 
@@ -56,145 +68,24 @@ internal class Sequencer : SequencerBase
 
     #endregion
 
-    #region Events and Delegates
+    #endregion
 
-    public delegate void OnStep(int currentBeat, int numberOfBeats);
+    #region Fields
+
+    /// <summary>
+    /// Event to be fired on every step.
+    /// </summary>
+    public OnStep onAnyStep;
 
     /// <summary>
     /// Event to be fired on non-empty steps.
     /// </summary>
     public OnStep onBeat;
-    /// <summary>
-    /// Event to be fired on every step.
-    /// </summary>
-    public OnStep onAnyStep;
-    #endregion
 
-    #region Variables
-
-    /// <summary>
-    /// Queues events to be fired make sure we are not missing any of them. Only created if the event is used.
-    /// </summary>
-    private Queue<Action> _onBeatEventQueue;
-    /// <summary>
-    /// Queues events to be fired make sure we are not missing any of them. Only created if the event is used.
-    /// </summary>
-    private Queue<Action> _onAnyStepEventQueue;
-
-    /// <summary>
-    /// Audio clip to be played by this sequencer.
-    /// </summary>
-    public AudioClip clip;
-    /// <summary>
-    /// Sequence of steps.
-    /// True = Play
-    /// False = Silent
-    /// </summary>
-    public bool[] sequence;
-    /// <summary>
-    /// Maximum back buffer allowed.
-    /// </summary>
-    [Range(0, 100)]
-    public int maxBackBufferSize = 0;
-    /// <summary>
-    /// Enlarge backbuffer count by number specified.
-    /// </summary>
-    [Range(0, 100)]
-    public int increaseBackBufferBy = 0;
-    /// <summary>
-    /// Fade in duration from muted to unmuted.
-    /// </summary>
-    [Range(0, 60)]
-    public float fadeInDuration;
-    /// <summary>
-    /// Fade in duration from unmuted to muted.
-    /// </summary>
-    [Range(0, 60)]
-    public float fadeOutDuration;
-    /// <summary>
-    /// When to trigger fade.
-    /// </summary>
-    [BitMask]
-    public FadeTarget fadeWhen;
-    /// <summary>
-    /// Current step.
-    /// </summary>
-    private int _currentStep;
-    /// <summary>
-    /// Time of next tick.
-    /// </summary>
-    private double _nextTick;
-    /// <summary>
-    /// Sample rate.
-    /// </summary>
-    private double _sampleRate;
-    /// <summary>
-    /// Current index of clip data.
-    /// </summary>
-    private int _index;
-    /// <summary>
-    /// Clip data.
-    /// </summary>
-    private float[] _clipData;
-    /// <summary>
-    /// List of backbuffers.
-    /// </summary>
-    private List<BackBuffer> _activeBackBuffers;
-    /// <summary>
-    /// Remaining beat events to be fired.
-    /// </summary>
-    private int _fireBeatEvent;
-    /// <summary>
-    /// Remaining any step events to be fired.
-    /// </summary>
-    private int _fireAnyStepEvent;
-    /// <summary>
-    /// Progress used to calculate approximate percentage.
-    /// </summary>
-    private double _progress;
-    /// <summary>
-    /// Temporary variable to set percentage on Audio Thread.
-    /// </summary>
-    private double _newPercentage = -1;
-    /// <summary>
-    /// Initial volume value to fade in.
-    /// </summary>
-    private float _initialVolumeValue;
-    /// <summary>
-    /// Volume of audio source just before fading in or out
-    /// </summary>
-    private float _volumeBeforeFade;
-    /// <summary>
-    /// Target volume when fade in/or finishes.
-    /// </summary>
-    private float _volumeAfterFade;
-    /// <summary>
-    /// Curernt percentage of fade progress.
-    /// </summary>
-    private float _fadeProgress = 1;
-    /// <summary>
-    /// Current fade speed;
-    /// </summary>
-    private float _fadeSpeed;
-    /// <summary>
-    /// What are we fading into.
-    /// </summary>
-    private FadeTarget _fadeTarget;
-    /// <summary>
-    /// Attached audio source.
-    /// </summary>
-    private AudioSource _audioSource;
-    /// <summary>
-    /// Number of channels the audio clip has.
-    /// </summary>
-    private int _clipChannels;
-    /// <summary>
-    /// Re-use BackBuffer's instead of creating a new one everytime we need it.
-    /// </summary>
-    private List<BackBuffer> _backBufferPool;
     #endregion
 
     #region Properties
+
     /// <summary>
     /// True if clip data is loaded.
     /// </summary>
@@ -214,10 +105,217 @@ internal class Sequencer : SequencerBase
     /// <summary>
     /// Signature Lenght
     /// </summary>
-    public int NumberOfBeats
+    public int NumberOfSteps
     {
         get { return sequence.Length; }
     }
+
+    #endregion
+
+    #region Nested type: BackBuffer
+
+    #region Structs
+
+    public class BackBuffer
+    {
+        #region Fields
+
+        /// <summary>
+        /// Data to be backbuffered
+        /// </summary>
+        public float[] data;
+
+        /// <summary>
+        /// Current index of data.
+        /// </summary>
+        public int index;
+
+        #endregion
+
+        #region Other Members
+
+        public BackBuffer()
+        {
+        }
+
+        public BackBuffer(float[] data)
+        {
+            this.data = data;
+            index = 0;
+        }
+
+        public void SetData(float[] data)
+        {
+            this.data = data;
+            index = 0;
+        }
+
+        public void ClearData()
+        {
+            data = null;
+            index = 0;
+        }
+
+        public static implicit operator bool(BackBuffer bb)
+        {
+            return !ReferenceEquals(bb, null);
+        }
+
+        #endregion
+    }
+
+    #endregion
+
+    #endregion
+
+    #region Variables
+
+    /// <summary>
+    /// Queues events to be fired make sure we are not missing any of them. Only created if the event is used.
+    /// </summary>
+    private Queue<Action> _onBeatEventQueue;
+
+    /// <summary>
+    /// Queues events to be fired make sure we are not missing any of them. Only created if the event is used.
+    /// </summary>
+    private Queue<Action> _onAnyStepEventQueue;
+
+    /// <summary>
+    /// Audio clip to be played by this sequencer.
+    /// </summary>
+    public AudioClip clip;
+
+    /// <summary>
+    /// Sequence of steps.
+    /// True = Play
+    /// False = Silent
+    /// </summary>
+    public bool[] sequence;
+
+    /// <summary>
+    /// Maximum back buffer allowed.
+    /// </summary>
+    [Range(0, 100)]
+    public int maxBackBufferSize = 0;
+
+    /// <summary>
+    /// Enlarge backbuffer count by number specified.
+    /// </summary>
+    [Range(0, 100)]
+    public int increaseBackBufferBy = 0;
+
+    /// <summary>
+    /// Fade in duration from muted to unmuted.
+    /// </summary>
+    [Range(0, 60)]
+    public float fadeInDuration;
+
+    /// <summary>
+    /// Fade in duration from unmuted to muted.
+    /// </summary>
+    [Range(0, 60)]
+    public float fadeOutDuration;
+
+    /// <summary>
+    /// When to trigger fade.
+    /// </summary>
+    [BitMask]
+    public FadeTarget fadeWhen;
+
+    /// <summary>
+    /// Current step.
+    /// </summary>
+    private int _currentStep;
+
+    /// <summary>
+    /// Time of next tick.
+    /// </summary>
+    private double _nextTick;
+
+    /// <summary>
+    /// Sample rate.
+    /// </summary>
+    private double _sampleRate;
+
+    /// <summary>
+    /// Current index of clip data.
+    /// </summary>
+    private int _index;
+
+    /// <summary>
+    /// Clip data.
+    /// </summary>
+    private float[] _clipData;
+
+    /// <summary>
+    /// List of backbuffers.
+    /// </summary>
+    private List<BackBuffer> _activeBackBuffers;
+
+    /// <summary>
+    /// Remaining beat events to be fired.
+    /// </summary>
+    private int _fireBeatEvent;
+
+    /// <summary>
+    /// Remaining any step events to be fired.
+    /// </summary>
+    private int _fireAnyStepEvent;
+
+    /// <summary>
+    /// Progress used to calculate approximate percentage.
+    /// </summary>
+    private double _progress;
+
+    /// <summary>
+    /// Temporary variable to set percentage on Audio Thread.
+    /// </summary>
+    private double _newPercentage = -1;
+
+    /// <summary>
+    /// Initial volume value to fade in.
+    /// </summary>
+    private float _initialVolumeValue;
+
+    /// <summary>
+    /// Volume of audio source just before fading in or out
+    /// </summary>
+    private float _volumeBeforeFade;
+
+    /// <summary>
+    /// Target volume when fade in/or finishes.
+    /// </summary>
+    private float _volumeAfterFade;
+
+    /// <summary>
+    /// Curernt percentage of fade progress.
+    /// </summary>
+    private float _fadeProgress = 1;
+
+    /// <summary>
+    /// Current fade speed;
+    /// </summary>
+    private float _fadeSpeed;
+
+    /// <summary>
+    /// What are we fading into.
+    /// </summary>
+    private FadeTarget _fadeTarget;
+
+    /// <summary>
+    /// Attached audio source.
+    /// </summary>
+    private AudioSource _audioSource;
+
+    /// <summary>
+    /// Number of channels the audio clip has.
+    /// </summary>
+    private int _clipChannels;
+
+    /// <summary>
+    /// Re-use BackBuffer's instead of creating a new one everytime we need it.
+    /// </summary>
+    private List<BackBuffer> _backBufferPool;
 
     #endregion
 
@@ -226,8 +324,8 @@ internal class Sequencer : SequencerBase
     public override void OnAwake()
     {
 #if UNITY_EDITOR
-        _isMutedOld = this.isMuted;
-        _oldBpm = this.bpm;
+        _isMutedOld = isMuted;
+        _oldBpm = bpm;
 #endif
         StartCoroutine(Init());
     }
@@ -528,7 +626,7 @@ internal class Sequencer : SequencerBase
         if (_activeBackBuffers != null) _activeBackBuffers.Clear();
 
         double samplesTotal = _sampleRate * 60.0F / bpm * 4.0F;
-        double samplesPerTick = samplesTotal / NumberOfBeats;
+        double samplesPerTick = samplesTotal / NumberOfSteps;
         double newSamplePos = samplesTotal * _newPercentage;
         double currentTickDouble = newSamplePos / samplesPerTick;
         _currentStep = (int)Math.Round(currentTickDouble, MidpointRounding.ToEven);
@@ -595,7 +693,7 @@ internal class Sequencer : SequencerBase
     void OnAudioFilterRead(float[] bufferData, int bufferChannels)
     {
         if (!IsReady || !_isPlaying) return;
-        double samplesPerTick = _sampleRate * 60.0F / bpm * 4.0F / NumberOfBeats;
+        double samplesPerTick = _sampleRate * 60.0F / bpm * 4.0F / NumberOfSteps;
         double sample = AudioSettings.dspTime * _sampleRate;
         if (_newPercentage > -1)
         {
@@ -613,7 +711,7 @@ internal class Sequencer : SequencerBase
                 {
                     dataLeft = (int)(newSample - _nextTick);
                     _nextTick += samplesPerTick;
-                    if (++_currentStep > NumberOfBeats) _currentStep = 1;
+                    if (++_currentStep > NumberOfSteps) _currentStep = 1;
                     _progress = _currentStep * samplesPerTick;
                     if (sequence[_currentStep - 1])
                     {
@@ -643,7 +741,8 @@ internal class Sequencer : SequencerBase
                         int sourceChannel = 0;
                         while (sourceChannel < bufferChannels)
                         {
-                            bufferData[dataIndex * bufferChannels + sourceChannel] += bb.data[bb.index * _clipChannels + clipChannel];
+                            bufferData[dataIndex * bufferChannels + sourceChannel] +=
+                                bb.data[bb.index * _clipChannels + clipChannel];
 
                             sourceChannel++;
                             clipChannel++;
@@ -666,7 +765,8 @@ internal class Sequencer : SequencerBase
                     int sourceChannel = 0;
                     while (sourceChannel < bufferChannels)
                     {
-                        bufferData[dataIndex * bufferChannels + sourceChannel] += _clipData[_index * _clipChannels + clipChannel];
+                        bufferData[dataIndex * bufferChannels + sourceChannel] +=
+                            _clipData[_index * _clipChannels + clipChannel];
 
                         sourceChannel++;
                         clipChannel++;
@@ -688,7 +788,7 @@ internal class Sequencer : SequencerBase
                     AddToBackBuffer(bufferChannels);
 
                     _nextTick += samplesPerTick;
-                    if (++_currentStep > NumberOfBeats)
+                    if (++_currentStep > NumberOfSteps)
                     {
                         _currentStep = 1;
                     }
@@ -699,7 +799,7 @@ internal class Sequencer : SequencerBase
                         if (onBeat != null)
                         {
                             if (_onBeatEventQueue == null) _onBeatEventQueue = new Queue<Action>();
-                            _onBeatEventQueue.Enqueue(() => onBeat(_currentStep, NumberOfBeats));
+                            _onBeatEventQueue.Enqueue(() => onBeat(_currentStep, NumberOfSteps));
                         }
                     }
                     else
@@ -709,7 +809,7 @@ internal class Sequencer : SequencerBase
                     if (onAnyStep != null)
                     {
                         if (_onAnyStepEventQueue == null) _onAnyStepEventQueue = new Queue<Action>();
-                        _onAnyStepEventQueue.Enqueue(() => onAnyStep(_currentStep, NumberOfBeats));
+                        _onAnyStepEventQueue.Enqueue(() => onAnyStep(_currentStep, NumberOfSteps));
                     }
                     if (log) Debug.Log("Tick: " + _currentStep + " (%" + GetPercentage() + ")");
                 }
@@ -732,7 +832,8 @@ internal class Sequencer : SequencerBase
                     int clipChannel = 0;
                     while (clipChannel < _clipChannels)
                     {
-                        newBackBuffer[(i - _index) * _clipChannels + clipChannel] = _clipData[i * _clipChannels + clipChannel];
+                        newBackBuffer[(i - _index) * _clipChannels + clipChannel] =
+                            _clipData[i * _clipChannels + clipChannel];
                         clipChannel++;
                     }
                 }
@@ -742,7 +843,7 @@ internal class Sequencer : SequencerBase
                     bb.SetData(newBackBuffer);
                     if (log)
                         print("New BackBuffer[" + newBackBuffer.Length + "] added. Total: " +
-                              _activeBackBuffers.Count + "/" + _activeBackBuffers.Capacity);
+                            _activeBackBuffers.Count + "/" + _activeBackBuffers.Capacity);
                 }
             }
         }
@@ -752,7 +853,8 @@ internal class Sequencer : SequencerBase
     {
         BackBuffer bb = null;
 
-        if (_activeBackBuffers == null && maxBackBufferSize > 0 && increaseBackBufferBy > 0) _activeBackBuffers = new List<BackBuffer>(increaseBackBufferBy);
+        if (_activeBackBuffers == null && maxBackBufferSize > 0 && increaseBackBufferBy > 0)
+            _activeBackBuffers = new List<BackBuffer>(increaseBackBufferBy);
         if (_activeBackBuffers != null && _activeBackBuffers.Count < maxBackBufferSize)
         {
             if (_activeBackBuffers.Count == _activeBackBuffers.Capacity)
@@ -836,46 +938,6 @@ internal class Sequencer : SequencerBase
         Selection.activeObject = go;
     }
 #endif
-
-    #endregion
-
-    #region Structs
-    public class BackBuffer
-    {
-        public BackBuffer() { }
-
-        public BackBuffer(float[] data)
-        {
-            this.data = data;
-            this.index = 0;
-        }
-
-        public void SetData(float[] data)
-        {
-            this.data = data;
-            index = 0;
-        }
-
-        public void ClearData()
-        {
-            data = null;
-            index = 0;
-        }
-
-        /// <summary>
-        /// Data to be backbuffered
-        /// </summary>
-        public float[] data;
-        /// <summary>
-        /// Current index of data.
-        /// </summary>
-        public int index = 0;
-
-        public static implicit operator bool(BackBuffer bb)
-        {
-            return !ReferenceEquals(bb, null);
-        }
-    }
 
     #endregion
 

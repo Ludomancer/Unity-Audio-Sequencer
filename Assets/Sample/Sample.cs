@@ -1,14 +1,9 @@
 ﻿using UnityEngine;
-using System.Collections.Generic;
 using UnityEngine.UI;
 
 internal class Sample : MonoBehaviour
 {
     #region Enumerations
-
-    #endregion
-
-    #region Events and Delegates
 
     #endregion
 
@@ -18,9 +13,6 @@ internal class Sample : MonoBehaviour
     public Text playingText;
     public Text bpmText;
     public Text mutedText;
-    #endregion
-
-    #region Properties
 
     #endregion
 
